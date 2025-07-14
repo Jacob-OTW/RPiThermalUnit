@@ -1,0 +1,3 @@
+[submodule "Mini2_USB"]
+	path = Mini2_USB
+	url = https://github.com/Jacob-OTW/Mini2_USB.git
