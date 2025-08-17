@@ -3,10 +3,8 @@ import cv2
 import numpy as np
 import time
 from gpiozero import Button, RotaryEncoder
-from Mini2_USB import Mini2
+import Mini2
 import enum
-from Mini2_USB.Mini2 import DigitalVideoFormat, DigitalFrameRate
-
 
 class Menu:
     """
@@ -108,10 +106,10 @@ class Camera:
             "x_offset": AdjustableValue(0, -256, 256),
             "y_offset": AdjustableValue(0, -192, 192),
             "scale": AdjustableValue(1, 0.1, 8),
-            "color": SelectorValue(["WHOT", "BHOT", "PSQ", ]),
+            "color": SelectorValue(["WHOT", "P45", "BHOT", ]),
         }
 
-        self.store_file_path = "store.pickle" # Needs to be adjusted!
+        self.store_file_path = "/home/pi/fusion/store.pickle"
 
         try:
             with open(self.store_file_path, "rb") as file:
@@ -198,11 +196,13 @@ class Camera:
     def set_50_hz(self):
         time.sleep(1)
 
-        self.mini2.set_detector_frame_rate(Mini2.DigitalFrameRate.Hz50)
+        self.mini2.dev.ctrl_transfer(bmRequestType=0x41, bRequest=32, wValue=0x0000, wIndex=0x0000,
+                               data_or_wLength=b'\x10\x10D\x002\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\xe4')
 
         time.sleep(1)
 
-        self.mini2.set_digital_video_format(1, DigitalVideoFormat.UsbProgressive, DigitalFrameRate.Hz50)
+        self.mini2.dev.ctrl_transfer(bmRequestType=0x41, bRequest=32, wValue=0x0000, wIndex=0x0000,
+                               data_or_wLength=b'\x10\x10F\x00\x01\x002\x00\x00\x00\x00\x00\x00\x00\x00\x00<=')
 
     def event_handler(self, event, target: SelectorValue | AdjustableValue):
         match event:

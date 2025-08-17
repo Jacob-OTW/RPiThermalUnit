@@ -5,6 +5,8 @@ import cv2
 import sys
 from menu import Camera
 from color_pallets import BHOT, WHOT, P45, PSQ, COTI
+import cProfile
+import pstats
 
 def c_to_k(c_temp):
     return 64 * (c_temp + 273.15)
@@ -21,11 +23,7 @@ def fit_rect_all(small: tuple[int, int], big: tuple[int, int]) -> tuple[int, int
 
     return int(small[0] / multi), int(small[1] / multi)
 
-
 def fast_scale(dst, src, offset, scale, target_size):
-    """
-    Used for shifting and scaling the camera image
-    """
     height, width, *_ = src.shape
     target_width, target_height = target_size
     offset_x, offset_y = int(offset[0]), int(offset[1])
@@ -58,7 +56,7 @@ def fast_scale(dst, src, offset, scale, target_size):
     dst[real_base_start_y:real_base_start_y + sized_height, real_base_start_x:real_base_start_x + sized_width] = sized_chopped
 
 def main():
-    os.system("TERM=linux setterm -foreground black -clear all >/dev/tty0") # Stops terminal cursor blinking
+    os.system("TERM=linux setterm -foreground black -clear all >/dev/tty0")
 
     with open(f"/sys/class/graphics/fb0/virtual_size", "r") as file:
         wh = file.read()
@@ -67,7 +65,7 @@ def main():
         h = int(ha)
         print(w, "x", h)
 
-    with open(f"/sys/class/graphics/fb0/bits_per_pixel", "r") as file:
+    with open(f"/sys/class/graphics/fb0/bits_per_pixel", "r") as file:  #
         bpp = int(file.read())
         if bpp != 16:
             print("BPP is not 16bit")
@@ -86,8 +84,12 @@ def main():
     cap = cv2.VideoCapture(-1)
     cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
 
+    # 1.13 -29 -32
+
+    # fps = []
+
     base = np.zeros((h, w, 3)).astype(np.uint8)
-    bgr = np.zeros((192, 256, 3)).astype(np.uint8)
+    bgr = np.zeros((cam.mini2.sensor_height, cam.mini2.sensor_width, 3)).astype(np.uint8)
 
     start_time = time.time()
     try:
@@ -96,6 +98,7 @@ def main():
             mils = time.time() - t
             t = time.time()
             if mils > 0:
+                # fps.append(1 / mils)
                 cam.fps = 1 / mils
 
             result, video_frame = cap.read()
@@ -104,19 +107,19 @@ def main():
             if not result:
                 continue
 
-            if disable_cursor_flag and time.time() - start_time > 1: # If this file in run directly on boot, sometimes it's faster than the processing starting the cursor, so it needs to be disabled again
+            if disable_cursor_flag and time.time() - start_time > 1:
                 disable_cursor_flag = False
                 os.system("TERM=linux setterm -foreground black -clear all >/dev/tty0")
 
-            white_hot_gray = cv2.cvtColor(np.reshape(video_frame.view(np.uint16), (192, 256, 1)).view(np.uint8), cv2.COLOR_YUV2GRAY_YUYV)
+            white_hot_gray = cv2.cvtColor(np.reshape(video_frame.view(np.uint16), (cam.mini2.sensor_height, cam.mini2.sensor_width, 1)).view(np.uint8), cv2.COLOR_YUV2GRAY_YUYV)
 
             match cam.store["color"].value:
                 case "WHOT":
-                    WHOT[:, :] = cv2.cvtColor(white_hot_gray, cv2.COLOR_GRAY2RGB)
+                    bgr[:, :] = cv2.cvtColor(white_hot_gray, cv2.COLOR_GRAY2RGB)
                 case "BHOT":
-                    BHOT[:, :] = BHOT[white_hot_gray]
-                case "PSQ":
-                    PSQ[:, :] = PSQ[white_hot_gray]
+                    bgr[:, :] = BHOT[white_hot_gray]
+                case "P45":
+                    bgr[:, :] = PSQ[white_hot_gray]
 
             base[:, :] = 0x00
 
@@ -125,6 +128,10 @@ def main():
 
             if cam.selected_menu is not None:
                 overlay_image(base, cv2.flip(cam.menu_image(), 1))
+
+            """last_10 = fps[-10:]
+            cv2.putText(master, f"{sum(last_10) / len(last_10):.1f}", (180, 60), cv2.FONT_HERSHEY_SIMPLEX,
+                        2, (255, 255, 255), 0, cv2.LINE_AA)"""
 
             pic16 = cv2.cvtColor(base, cv2.COLOR_RGB2BGR565).view(dtype=np.uint16)
 
