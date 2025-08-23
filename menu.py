@@ -129,7 +129,7 @@ class Camera:
 
             self.event_handler(self.Event.ValueChange, self.store[key])
 
-        self.set_50_hz()
+        self.set_high_fps()
         self.mini2.set_flip(Mini2.FlipMode.X_Flip)
 
         self.fps = -1
@@ -144,7 +144,7 @@ class Camera:
             SubMenuButton("Align Settings", lambda: self.set_menu(self.align_menu)),
             SubMenuButton("Store", lambda: self.set_menu(self.store_menu)),
             Selector(lambda color: f"Color {color}", self.store["color"]),
-            SubMenuButton(lambda: f"FPS {self.fps:.1f}", lambda: self.set_50_hz()),
+            SubMenuButton(lambda: f"FPS {self.fps:.1f}", lambda: self.set_high_fps()),
             SubMenuButton("Exit", lambda: self.set_menu(None)),
         )
 
@@ -193,16 +193,14 @@ class Camera:
         with open(self.store_file_path, "wb") as file:
             pickle.dump(self.store, file)
 
-    def set_50_hz(self):
+    def set_high_fps(self):
         time.sleep(1)
 
-        self.mini2.dev.ctrl_transfer(bmRequestType=0x41, bRequest=32, wValue=0x0000, wIndex=0x0000,
-                               data_or_wLength=b'\x10\x10D\x002\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\xe4')
+        self.mini2.set_detector_frame_rate(Mini2.Hz50 if self.mini2.sensor_width == 256 else Mini2.Hz60)
 
         time.sleep(1)
 
-        self.mini2.dev.ctrl_transfer(bmRequestType=0x41, bRequest=32, wValue=0x0000, wIndex=0x0000,
-                               data_or_wLength=b'\x10\x10F\x00\x01\x002\x00\x00\x00\x00\x00\x00\x00\x00\x00<=')
+        self.mini2.set_digital_video_format(1, Mini2.UsbProgressive, Mini2.Hz50 if self.mini2.sensor_width == 256 else Mini2.Hz60)
 
     def event_handler(self, event, target: SelectorValue | AdjustableValue):
         match event:
